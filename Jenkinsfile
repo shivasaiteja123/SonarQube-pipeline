@@ -5,7 +5,7 @@ pipeline {
         // Environment variables for SonarQube and GitHub
         SONAR_HOST_URL = 'http://localhost:9000' // Update the SonarQube URL if necessary
         SONAR_AUTH_TOKEN = credentials('SonarQubeToken')  // Using credentials securely stored in Jenkins
-        GITHUB_TOKEN = credentials('GithubToken')  // Ensure this credential exists in Jenkins
+        GITHUB_TOKEN = credentials('GithubToken') 
     }
 
     stages {
