@@ -2,24 +2,21 @@ pipeline {
     agent any
 
     environment {
-        // Environment variables for SonarQube and GitHub
-        SONAR_HOST_URL = 'http://localhost:9000' // Update the SonarQube URL if necessary
-        SONAR_AUTH_TOKEN = credentials('SonarqubeToken')  // SonarQube token credential ID
-        GITHUB_TOKEN = credentials('GithubToken')  // GitHub token credential ID
+        SONAR_HOST_URL = 'http://localhost:9000'
+        SONAR_AUTH_TOKEN = 'sqa_1ebae7b0ace5ef257098ede22a1db4a0068c6bad'
+        GITHUB_TOKEN = credentials('GithubToken') // Ensure this credential exists in Jenkins
     }
 
     stages {
         stage('Checkout') {
             steps {
                 script {
-                    // Checkout code from GitHub using credentials
-                    withCredentials([string(credentialsId: 'GithubToken', variable: 'GITHUB_TOKEN')]) {
+                    withCredentials([usernamePassword(credentialsId: 'GithubToken', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
                         checkout([
                             $class: 'GitSCM',
-                            branches: [[name: '*/main']],  // Update if you're using a different branch
+                            branches: [[name: '*/main']],
                             userRemoteConfigs: [[
-                                url: "https://github.com/shivasaiteja123/SonarQube-pipeline.git",
-                                credentialsId: 'GithubToken'
+                                url: "https://${GIT_USER}:${GIT_PASS}@github.com/shivasaiteja123/sonar-python-demo.git"
                             ]]
                         ])
                     }
@@ -30,15 +27,14 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    // Run SonarQube analysis using SonarScanner
-                    withSonarQubeEnv('SonarQube') { // Ensure "SonarQube" is configured in Jenkins
+                    withSonarQubeEnv('SonarQube') { // Make sure "SonarQube" is configured in Jenkins
                         bat """
-                            C:\\SonarScanner\\sonar-scanner-7.0.2.4839-windows-x64\\bin\\sonar-scanner ^  // Update path if necessary
-                            -Dsonar.projectKey=sonar-pipeline-demo ^  // Update project key if needed
-                            -Dsonar.sources=. ^  // Adjust source directories if needed
-                            -Dsonar.host.url=%SONAR_HOST_URL% ^  // Use environment variable
-                            -Dsonar.login=%SONAR_AUTH_TOKEN% ^  // Use SonarQube token for authentication
-                            -Dsonar.java.source=1.8  // Adjust this according to your project type (e.g., 1.8 for Java)
+                            C:\\SonarScanner\\sonar-scanner-7.0.2.4839-windows-x64\\bin\\sonar-scanner ^
+                            -Dsonar.projectKey=sonar-python-demo ^
+                            -Dsonar.sources=. ^
+                            -Dsonar.host.url=%SONAR_HOST_URL% ^
+                            -Dsonar.login=%SONAR_AUTH_TOKEN% ^
+                            -Dsonar.python.version=3.10
                         """
                     }
                 }
@@ -48,7 +44,6 @@ pipeline {
         stage('Quality Gate') {
             steps {
                 script {
-                    // Wait for the quality gate result
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -66,7 +61,7 @@ pipeline {
                     <p><b>Build Number:</b> ${env.BUILD_NUMBER}</p>
                     <p><b>Status:</b> ${currentBuild.currentResult}</p>
                     <p><b>Build URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
-                    <p><b>SonarQube Report:</b> <a href="http://localhost:9000/dashboard?id=sonar-pipeline-demo">View Report</a></p>
+                    <p><b>SonarQube Report:</b> <a href="http://localhost:9000/dashboard?id=sonar-python-demo">View Report</a></p>
                 """,
                 mimeType: 'text/html',
                 to: 'saiteja.y@coresonant.com',  // Update as needed
