@@ -52,11 +52,9 @@ pipeline {
         stage('Fetch SonarQube Report') {
             steps {
                 script {
-                    // Use curl with Bearer token authentication and write to file
+                    // Use correct curl syntax to fetch the report
                     bat """
-                        curl -s -u %SONAR_AUTH_TOKEN%: ^ 
-                        "${SONAR_HOST_URL}/api/issues/search?projectKeys=sonar-python-demo" ^ 
-                        -o sonar-report.json
+                        curl -s -u %SONAR_AUTH_TOKEN%: "%SONAR_HOST_URL%/api/issues/search?projectKeys=sonar-python-demo" -o sonar-report.json
                     """
                 }
             }
@@ -89,8 +87,7 @@ pipeline {
                 script {
                     // Call delete API using curl with POST method
                     bat """
-                        curl -X POST -s -u %SONAR_AUTH_TOKEN%: ^ 
-                        "${SONAR_HOST_URL}/api/projects/delete?project=sonar-python-demo"
+                        curl -X POST -s -u %SONAR_AUTH_TOKEN%: "%SONAR_HOST_URL%/api/projects/delete?project=sonar-python-demo"
                     """
                 }
             }
