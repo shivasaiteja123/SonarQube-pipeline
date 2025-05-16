@@ -16,7 +16,7 @@ pipeline {
                             $class: 'GitSCM',
                             branches: [[name: '*/main']],
                             userRemoteConfigs: [[
-                                url: "https://${GIT_USER}:${GIT_PASS}@github.com/shivasaiteja123/sonar-python-demo.git"
+                                url: "https://${GIT_USER}:${GIT_PASS}@github.com/shivasaiteja123/SonarQube-pipeline.git"
                             ]]
                         ])
                     }
