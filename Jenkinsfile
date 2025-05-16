@@ -2,22 +2,40 @@ pipeline {
     agent any
 
     environment {
-        GIT_CREDENTIALS = credentials('GithubToken')
-        SONARQUBE = 'SonarQube'
+        SONAR_HOST_URL = 'http://localhost:9000'
+        SONAR_AUTH_TOKEN = 'sqa_1ebae7b0ace5ef257098ede22a1db4a0068c6bad'
+        GITHUB_TOKEN = credentials('GithubToken') // Ensure this credential exists in Jenkins
     }
 
     stages {
-        stage('Checkout SCM') {
+        stage('Checkout') {
             steps {
-                checkout scm
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'GithubToken', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+                        checkout([
+                            $class: 'GitSCM',
+                            branches: [[name: '*/main']],
+                            userRemoteConfigs: [[
+                                url: "https://${GIT_USER}:${GIT_PASS}@github.com/shivasaiteja123/SonarQube-pipeline.git"
+                            ]]
+                        ])
+                    }
+                }
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    withSonarQubeEnv(SONARQUBE) {
-                        bat 'C:\\SonarScanner\\sonar-scanner-7.0.2.4839-windows-x64\\bin\\sonar-scanner'
+                    withSonarQubeEnv('SonarQube') { // Make sure "SonarQube" is configured in Jenkins
+                        bat """
+                            C:\\SonarScanner\\sonar-scanner-7.0.2.4839-windows-x64\\bin\\sonar-scanner ^
+                            -Dsonar.projectKey=sonar-python-demo ^
+                            -Dsonar.sources=. ^
+                            -Dsonar.host.url=%SONAR_HOST_URL% ^
+                            -Dsonar.login=%SONAR_AUTH_TOKEN% ^
+                            -Dsonar.python.version=3.10
+                        """
                     }
                 }
             }
@@ -26,49 +44,36 @@ pipeline {
         stage('Quality Gate') {
             steps {
                 script {
-                    waitForQualityGate()
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
-
-        stage('Fetch SonarQube Report') {
-            steps {
-                bat 'curl -s -u $SONAR_TOKEN: "http://localhost:9000/api/issues/search?projectKeys=SonarQube-pipeline" -o sonar-report.json'
-            }
-        }
-
-        stage('Generate Summary') {
-            steps {
-                // Add steps to process the fetched report and generate a summary.
-            }
-        }
-
-        stage('Archive Report') {
-            steps {
-                // Add steps for archiving reports if needed.
-            }
-        }
-
-        stage('Clean Up Sonar Project') {
-            steps {
-                // Add cleanup steps.
-            }
-        }
-
-        stage('Post Actions') {
-            steps {
-                emailext (
-                    subject: "SonarQube Analysis Complete",
-                    body: "Please find the attached SonarQube report.",
-                    to: 'saiteja.y@coresonant.com'
-                )
-            }
-        }
     }
-    
+
     post {
         always {
-            cleanWs()
+            echo 'Pipeline finished! Sending email notification...'
+            emailext (
+                subject: "Jenkins Pipeline: ${env.JOB_NAME} #${env.BUILD_NUMBER} - ${currentBuild.currentResult}",
+                body: """
+                    <p><b>Jenkins Pipeline Execution Report</b></p>
+                    <p><b>Project:</b> ${env.JOB_NAME}</p>
+                    <p><b>Build Number:</b> ${env.BUILD_NUMBER}</p>
+                    <p><b>Status:</b> ${currentBuild.currentResult}</p>
+                    <p><b>Build URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                    <p><b>SonarQube Report:</b> <a href="http://localhost:9000/dashboard?id=SonarQube-pipeline">View Report</a></p>
+                """,
+                mimeType: 'text/html',
+                to: 'saiteja.y@coresonant.com',  // Update as needed
+                replyTo: 'notification@aiscipro.com',
+                from: 'notification@aiscipro.com'  // Optional "from" config
+            )
+        }
+        success {
+            echo 'Build successful. Email sent.'
+        }
+        failure {
+            echo 'Build failed. Email sent.'
         }
     }
 }
