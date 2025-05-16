@@ -17,7 +17,7 @@ pipeline {
                             $class: 'GitSCM',
                             branches: [[name: '*/main']],
                             userRemoteConfigs: [[
-                                url: "https://${GIT_USER}:${GIT_PASS}@github.com/shivasaiteja123/SonarQube-pipeline.git"
+                                url: "https://${GIT_USER}:${GIT_PASS}@github.com/shivasaiteja123/sonar-python-demo.git"
                             ]]
                         ])
                     }
@@ -62,7 +62,7 @@ pipeline {
                     <p><b>Build Number:</b> ${env.BUILD_NUMBER}</p>
                     <p><b>Status:</b> ${currentBuild.currentResult}</p>
                     <p><b>Build URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
-                    <p><b>SonarQube Report:</b> <a href="http://localhost:9000/dashboard?id=SonarQube-pipeline">View Report</a></p>
+                    <p><b>SonarQube Report:</b> <a href="http://localhost:9000/dashboard?id=sonar-python-demo">View Report</a></p>
                 """,
                 mimeType: 'text/html',
                 to: 'saiteja.y@coresonant.com',  // Update as needed
