@@ -4,7 +4,7 @@ pipeline {
     environment {
         SONAR_HOST_URL = 'http://localhost:9000'
         SONAR_AUTH_TOKEN = 'sqa_1ebae7b0ace5ef257098ede22a1db4a0068c6bad'
-        GITHUB_TOKEN = credentials('GithubToken') // Ensure this credential exists in Jenkins
+        GITHUB_TOKEN = credentials('GithubToken')
     }
 
     stages {
@@ -27,7 +27,7 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    withSonarQubeEnv('SonarQube') { // Make sure "SonarQube" is configured in Jenkins
+                    withSonarQubeEnv('SonarQube') {
                         bat """
                             C:\\SonarScanner\\sonar-scanner-7.0.2.4839-windows-x64\\bin\\sonar-scanner ^
                             -Dsonar.projectKey=sonar-python-demo ^
@@ -48,6 +48,51 @@ pipeline {
                 }
             }
         }
+
+        stage('Fetch SonarQube Report') {
+            steps {
+                script {
+                    def report = httpRequest authentication: 'SonarQubeAuth',
+                        url: "${SONAR_HOST_URL}/api/issues/search?projectKeys=sonar-python-demo"
+                    
+                    writeFile file: 'sonar-report.json', text: report.content
+                }
+            }
+        }
+
+        stage('Generate Summary') {
+            steps {
+                script {
+                    def issues = readJSON file: 'sonar-report.json'
+                    def summary = "SonarQube Issues: ${issues.total}\n\n"
+                    issues.issues.take(10).each { issue ->
+                        summary += "- ${issue.severity}: ${issue.message} at ${issue.component} [line ${issue.line}]\n"
+                    }
+                    writeFile file: 'summary.txt', text: summary
+                }
+            }
+        }
+
+        stage('Archive Report') {
+            steps {
+                archiveArtifacts artifacts: 'sonar-report.json, summary.txt', fingerprint: true
+            }
+        }
+
+        stage('Clean Up Sonar Project') {
+            when {
+                expression { currentBuild.currentResult == 'SUCCESS' }
+            }
+            steps {
+                script {
+                    httpRequest(
+                        httpMode: 'POST',
+                        authentication: 'SonarQubeAuth',
+                        url: "${SONAR_HOST_URL}/api/projects/delete?project=sonar-python-demo"
+                    )
+                }
+            }
+        }
     }
 
     post {
@@ -62,18 +107,13 @@ pipeline {
                     <p><b>Status:</b> ${currentBuild.currentResult}</p>
                     <p><b>Build URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
                     <p><b>SonarQube Report:</b> <a href="http://localhost:9000/dashboard?id=sonar-python-demo">View Report</a></p>
+                    <pre>${readFile('summary.txt')}</pre>
                 """,
                 mimeType: 'text/html',
-                to: 'saiteja.y@coresonant.com',  // Update as needed
+                to: 'saiteja.y@coresonant.com',
                 replyTo: 'notification@aiscipro.com',
-                from: 'notification@aiscipro.com'  // Optional "from" config
+                from: 'notification@aiscipro.com'
             )
-        }
-        success {
-            echo 'Build successful. Email sent.'
-        }
-        failure {
-            echo 'Build failed. Email sent.'
         }
     }
 }
