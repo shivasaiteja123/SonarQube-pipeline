@@ -29,11 +29,11 @@ pipeline {
                 script {
                     withSonarQubeEnv('SonarQube') {
                         bat """
-                            C:\\SonarScanner\\sonar-scanner-7.0.2.4839-windows-x64\\bin\\sonar-scanner ^
-                            -Dsonar.projectKey=sonar-python-demo ^
-                            -Dsonar.sources=. ^
-                            -Dsonar.host.url=%SONAR_HOST_URL% ^
-                            -Dsonar.token=%SONAR_AUTH_TOKEN% ^
+                            C:\\SonarScanner\\sonar-scanner-7.0.2.4839-windows-x64\\bin\\sonar-scanner ^ 
+                            -Dsonar.projectKey=sonar-python-demo ^ 
+                            -Dsonar.sources=. ^ 
+                            -Dsonar.host.url=%SONAR_HOST_URL% ^ 
+                            -Dsonar.token=%SONAR_AUTH_TOKEN% ^ 
                             -Dsonar.python.version=3.10
                         """
                     }
@@ -52,11 +52,12 @@ pipeline {
         stage('Fetch SonarQube Report') {
             steps {
                 script {
-                    def response = httpRequest(
-                        authentication: 'SonarQubeAuth',
-                        url: "${SONAR_HOST_URL}/api/issues/search?projectKeys=sonar-python-demo"
-                    )
-                    writeFile file: 'sonar-report.json', text: response.content
+                    // Use curl with Bearer token authentication and write to file
+                    bat """
+                        curl -s -u %SONAR_AUTH_TOKEN%: ^ 
+                        "${SONAR_HOST_URL}/api/issues/search?projectKeys=sonar-python-demo" ^ 
+                        -o sonar-report.json
+                    """
                 }
             }
         }
@@ -86,11 +87,11 @@ pipeline {
             }
             steps {
                 script {
-                    httpRequest(
-                        httpMode: 'POST',
-                        authentication: 'SonarQubeAuth',
-                        url: "${SONAR_HOST_URL}/api/projects/delete?project=sonar-python-demo"
-                    )
+                    // Call delete API using curl with POST method
+                    bat """
+                        curl -X POST -s -u %SONAR_AUTH_TOKEN%: ^ 
+                        "${SONAR_HOST_URL}/api/projects/delete?project=sonar-python-demo"
+                    """
                 }
             }
         }
