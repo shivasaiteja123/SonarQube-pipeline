@@ -1,11 +1,10 @@
-
 pipeline {
     agent any
 
     environment {
         SONAR_HOST_URL = 'http://localhost:9000'
-        SONAR_AUTH_TOKEN = 'sqa_1ebae7b0ace5ef257098ede22a1db4a0068c6bad'
-        GITHUB_TOKEN = credentials('GithubToken') // Ensure this credential exists in Jenkins
+        SONAR_PROJECT_KEY = 'SonarQube-pipeline'
+        SONAR_AUTH_TOKEN = credentials('SonarqubeToken') // Use your stored token
     }
 
     stages {
@@ -17,7 +16,7 @@ pipeline {
                             $class: 'GitSCM',
                             branches: [[name: '*/main']],
                             userRemoteConfigs: [[
-                                url: "https://${GIT_USER}:${GIT_PASS}@github.com/shivasaiteja123/sonar-python-demo.git"
+                                url: "https://${GIT_USER}:${GIT_PASS}@github.com/shivasaiteja123/SonarQube-pipeline.git"
                             ]]
                         ])
                     }
@@ -28,13 +27,13 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    withSonarQubeEnv('SonarQube') { // Make sure "SonarQube" is configured in Jenkins
+                    withSonarQubeEnv('SonarQube') {
                         bat """
                             C:\\SonarScanner\\sonar-scanner-7.0.2.4839-windows-x64\\bin\\sonar-scanner ^
-                            -Dsonar.projectKey=sonar-python-demo ^
+                            -Dsonar.projectKey=${SONAR_PROJECT_KEY} ^
                             -Dsonar.sources=. ^
-                            -Dsonar.host.url=%SONAR_HOST_URL% ^
-                            -Dsonar.login=%SONAR_AUTH_TOKEN% ^
+                            -Dsonar.host.url=${SONAR_HOST_URL} ^
+                            -Dsonar.login=${SONAR_AUTH_TOKEN} ^
                             -Dsonar.python.version=3.10
                         """
                     }
@@ -49,32 +48,77 @@ pipeline {
                 }
             }
         }
+
+        stage('Fetch Sonar Report') {
+            steps {
+                script {
+                    bat """
+                    curl -s -u ${SONAR_AUTH_TOKEN}: ^
+                      "${SONAR_HOST_URL}/api/issues/search?projectKeys=${SONAR_PROJECT_KEY}" ^
+                      -o sonar_issues.json
+
+                    curl -s -u ${SONAR_AUTH_TOKEN}: ^
+                      "${SONAR_HOST_URL}/api/qualitygates/project_status?projectKey=${SONAR_PROJECT_KEY}" ^
+                      -o quality_gate.json
+                    """
+                }
+            }
+        }
+
+        stage('Archive Report') {
+            steps {
+                archiveArtifacts artifacts: 'sonar_issues.json, quality_gate.json', onlyIfSuccessful: true
+            }
+        }
+
+        stage('Cleanup Sonar Project') {
+            steps {
+                script {
+                    bat """
+                    curl -X POST -u ${SONAR_AUTH_TOKEN}: ^
+                      "${SONAR_HOST_URL}/api/projects/delete?project=${SONAR_PROJECT_KEY}"
+                    """
+                }
+            }
+        }
     }
 
     post {
         always {
-            echo 'Pipeline finished! Sending email notification...'
-            emailext (
-                subject: "Jenkins Pipeline: ${env.JOB_NAME} #${env.BUILD_NUMBER} - ${currentBuild.currentResult}",
-                body: """
-                    <p><b>Jenkins Pipeline Execution Report</b></p>
-                    <p><b>Project:</b> ${env.JOB_NAME}</p>
-                    <p><b>Build Number:</b> ${env.BUILD_NUMBER}</p>
-                    <p><b>Status:</b> ${currentBuild.currentResult}</p>
-                    <p><b>Build URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
-                    <p><b>SonarQube Report:</b> <a href="http://localhost:9000/dashboard?id=sonar-python-demo">View Report</a></p>
-                """,
-                mimeType: 'text/html',
-                to: 'saiteja.y@coresonant.com',  // Update as needed
-                replyTo: 'notification@aiscipro.com',
-                from: 'notification@aiscipro.com'  // Optional "from" config
-            )
-        }
-        success {
-            echo 'Build successful. Email sent.'
-        }
-        failure {
-            echo 'Build failed. Email sent.'
+            script {
+                echo 'Pipeline finished! Sending email notification via SMTP2GO API...'
+
+                withCredentials([string(credentialsId: 'smtp2go-api-key', variable: 'SMTP2GO_API_KEY')]) {
+                    def emailSubject = "Jenkins Pipeline: ${env.JOB_NAME} #${env.BUILD_NUMBER} - ${currentBuild.currentResult}"
+                    def emailBody = """
+                        <p><b>Jenkins Pipeline Execution Report</b></p>
+                        <p><b>Project:</b> ${env.JOB_NAME}</p>
+                        <p><b>Build Number:</b> ${env.BUILD_NUMBER}</p>
+                        <p><b>Status:</b> ${currentBuild.currentResult}</p>
+                        <p><b>Build URL:</b> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                        <p><b>SonarQube Report:</b> <a href="${SONAR_HOST_URL}/dashboard?id=${SONAR_PROJECT_KEY}">View Report</a></p>
+                    """
+
+                    def payload = [
+                        api_key: SMTP2GO_API_KEY,
+                        to: ["yerramchattyshivasaiteja2003@gmail.com"],
+                        sender: "saiteja.y@coresonant.com",
+                        subject: emailSubject,
+                        html_body: emailBody
+                    ]
+
+                    def response = httpRequest(
+                        acceptType: 'APPLICATION_JSON',
+                        contentType: 'APPLICATION_JSON',
+                        httpMode: 'POST',
+                        requestBody: groovy.json.JsonOutput.toJson(payload),
+                        url: 'https://api.smtp2go.com/v3/email/send'
+                    )
+
+                    echo "SMTP2GO API response status: ${response.status}"
+                    echo "SMTP2GO API response content: ${response.content}"
+                }
+            }
         }
     }
 }
