@@ -101,7 +101,7 @@ pipeline {
 
                     def payload = [
                         api_key: SMTP2GO_API_KEY,
-                        to: ["yerramchattyshivasaiteja2003@gmail.com"],
+                        to: ["aiscipro@coresonant.com"],
                         sender: "saiteja.y@coresonant.com",
                         subject: emailSubject,
                         html_body: emailBody
