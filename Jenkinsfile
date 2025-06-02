@@ -1,8 +1,8 @@
 pipeline {
     agent any
 
-    environment {
-        SONAR_HOST_URL = 'http://localhost:9000'
+    environment {     
+        SONAR_HOST_URL = 'http://192.168.25.10:9000'
         SONAR_PROJECT_KEY = 'SonarQube-pipeline'
         SONAR_AUTH_TOKEN = credentials('SonarqubeToken') // Use your stored token
     }
